@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SQL Trainer</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- CodeMirror (local) -->
+  <link rel="stylesheet" href="vendor/codemirror/codemirror.min.css">
+  <link rel="stylesheet" href="vendor/codemirror/material-darker.min.css">
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <meta name="theme-color" content="#6366f1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SQL Trainer">
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="nav-left">
+    <span class="nav-logo">◈</span>
+    <span class="nav-title">SQL Trainer</span>
+  </div>
+  <div class="nav-center">
+    <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+    <button class="nav-btn" data-view="review">Review Cards</button>
+    <button class="nav-btn" data-view="quiz">Quiz</button>
+  </div>
+  <div class="nav-right">
+    <div class="session-indicator">
+      <span class="dot" id="dot-1" title="Session 1"></span>
+      <span class="dot" id="dot-2" title="Session 2"></span>
+      <span class="dot" id="dot-3" title="Session 3"></span>
+    </div>
+    <span class="session-label" id="session-label">0 / 3 today</span>
+  </div>
+</nav>
+
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay" style="
+  position:fixed;inset:0;background:#0e1016;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:16px;z-index:500;
+  color:#94a3b8;font-family:sans-serif;font-size:14px;">
+  <div id="loading-spinner" style="font-size:32px;animation:spin 1s linear infinite">◈</div>
+  <p>Loading SQL engine…</p>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+<!-- ═══════════════════════════════════════
+     DASHBOARD VIEW
+═══════════════════════════════════════ -->
+<main id="view-dashboard" class="view hidden">
+  <div class="dashboard-hero">
+    <div class="hero-text">
+      <h1 id="hero-greeting">Good to see you!</h1>
+      <p class="hero-sub">Pick up where you left off, or start a fresh session.</p>
+    </div>
+    <div class="hero-stats">
+      <div class="stat-card">
+        <span class="stat-number" id="stat-completed">0</span>
+        <span class="stat-label">Lessons done</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number" id="stat-exercises">0</span>
+        <span class="stat-label">Exercises solved</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number" id="stat-streak">0</span>
+        <span class="stat-label">Day streak</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sync bar -->
+  <div class="sync-bar">
+    <span class="sync-label">Sync progress across devices</span>
+    <div class="sync-actions">
+      <button class="sync-btn sync-export" id="btn-export">↑ Copy sync code</button>
+      <button class="sync-btn sync-import" id="btn-import-toggle">↓ Import code</button>
+    </div>
+  </div>
+  <div id="import-panel" class="import-panel hidden">
+    <textarea id="sync-input" class="sync-input" placeholder="Paste your sync code here…"></textarea>
+    <div class="import-panel-actions">
+      <button class="import-apply-btn" id="btn-import-apply">Apply</button>
+      <button class="import-cancel-btn" id="btn-import-cancel">Cancel</button>
+    </div>
+  </div>
+
+  <div id="continue-banner" class="continue-banner hidden">
+    <span class="continue-icon">▷</span>
+    <div class="continue-text">
+      <strong id="continue-title"></strong>
+      <span id="continue-sub"></span>
+    </div>
+    <button class="continue-btn" id="continue-btn">Continue →</button>
+  </div>
+
+  <div id="modules-grid" class="modules-grid"></div>
+</main>
+
+<!-- ═══════════════════════════════════════
+     LESSON VIEW
+═══════════════════════════════════════ -->
+<main id="view-lesson" class="view hidden">
+  <div class="lesson-topbar">
+    <button class="back-btn" id="back-btn">← Dashboard</button>
+    <div class="lesson-breadcrumb">
+      <span id="lb-module" class="lb-module"></span>
+      <span class="lb-sep">›</span>
+      <span id="lb-title" class="lb-title"></span>
+      <span class="lb-duration" id="lb-duration"></span>
+    </div>
+    <div class="lesson-topbar-right">
+      <button class="schema-fab" id="btn-schema" title="View database schema">
+        <span class="schema-fab-icon">⊞</span> Schema
+      </button>
+      <div class="lesson-nav-group">
+        <button class="ln-btn" id="btn-prev">← Prev</button>
+        <button class="ln-btn ln-primary" id="btn-next">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="lesson-layout">
+
+    <!-- Left panel: Theory + Exercises -->
+    <div class="l-panel left-panel">
+      <div class="panel-tabs">
+        <button class="ptab active" data-tab="theory">Theory</button>
+        <button class="ptab" data-tab="exercises">
+          Exercises
+          <span class="ex-badge" id="ex-badge">0 / 0</span>
+        </button>
+      </div>
+      <div id="tab-theory" class="panel-body scrollable">
+        <div id="theory-content" class="theory-content"></div>
+        <!-- Personal Notes -->
+        <div class="notes-section">
+          <label class="notes-label" for="lesson-notes">My Notes</label>
+          <textarea
+            id="lesson-notes"
+            class="notes-textarea"
+            placeholder="Write your own summary or key takeaways here…"
+          ></textarea>
+        </div>
+      </div>
+      <div id="tab-exercises" class="panel-body scrollable hidden">
+        <div id="exercises-list"></div>
+      </div>
+    </div>
+
+    <!-- Right panel: Editor + Results -->
+    <div class="l-panel right-panel">
+      <div class="editor-wrap">
+        <div class="editor-toolbar">
+          <span class="tl-label">SQL Editor</span>
+          <div class="tl-right">
+            <button class="tl-btn" id="btn-clear">Clear</button>
+            <button class="tl-btn" id="btn-reset-db" title="Restore sample data">↺ Reset DB</button>
+            <button class="run-btn" id="btn-run">▶ Run &nbsp;<kbd>Ctrl+↵</kbd></button>
+          </div>
+        </div>
+        <textarea
+          id="sql-editor"
+          class="sql-editor"
+          placeholder="-- Write your SQL here
+SELECT * FROM employees;"
+          spellcheck="false"
+          autocorrect="off"
+          autocapitalize="off"
+        ></textarea>
+      </div>
+
+      <div class="results-wrap">
+        <div class="results-toolbar">
+          <span class="tl-label">Results</span>
+          <span id="results-meta" class="results-meta"></span>
+        </div>
+        <div id="results-area" class="results-area">
+          <div class="results-empty">
+            <span class="results-icon">▷</span>
+            <span>Run a query to see results here</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="checker-wrap hidden" id="checker-wrap">
+        <div class="active-exercise-label" id="active-ex-label">
+          Click an exercise above to activate it
+        </div>
+        <div class="checker-actions">
+          <button class="check-btn" id="btn-check">✓ Check answer</button>
+          <button class="hint-btn" id="btn-hint">💡 Hint</button>
+          <button class="solution-btn" id="btn-solution">Show solution</button>
+        </div>
+        <div id="check-result" class="check-result hidden"></div>
+        <div id="hint-box" class="hint-box hidden"></div>
+        <div id="solution-box" class="solution-box hidden"></div>
+        <!-- Diff View (shown on wrong answer) -->
+        <div id="diff-view" class="diff-view hidden">
+          <div class="diff-panel">
+            <div class="diff-hdr diff-hdr-yours">Your output <span id="diff-yours-count" class="diff-count"></span></div>
+            <div class="diff-table-wrap" id="diff-yours-table"></div>
+          </div>
+          <div class="diff-panel">
+            <div class="diff-hdr diff-hdr-expected">Expected <span id="diff-exp-count" class="diff-count"></span></div>
+            <div class="diff-table-wrap" id="diff-exp-table"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- ═══════════════════════════════════════
+     REVIEW VIEW
+═══════════════════════════════════════ -->
+<main id="view-review" class="view hidden">
+  <div class="review-header">
+    <h1>Review Cards</h1>
+    <p>Quick syntax reference for everything you've learned.</p>
+  </div>
+  <div id="review-grid" class="review-grid"></div>
+</main>
+
+<!-- ═══════════════════════════════════════
+     QUIZ VIEW
+═══════════════════════════════════════ -->
+<main id="view-quiz" class="view hidden">
+  <div class="quiz-container">
+
+    <!-- Start screen -->
+    <div id="quiz-start" class="quiz-screen">
+      <div class="quiz-start-card">
+        <div class="quiz-emoji">🧠</div>
+        <h2>Quick Review Quiz</h2>
+        <p id="quiz-start-desc">10 questions drawn from your completed lessons, weighted toward concepts you've struggled with.</p>
+        <div id="quiz-no-lessons" class="quiz-warning hidden">
+          Complete at least one lesson to unlock the quiz.
+        </div>
+        <button class="quiz-start-btn" id="btn-start-quiz">Start Quiz →</button>
+      </div>
+    </div>
+
+    <!-- Question screen -->
+    <div id="quiz-question" class="quiz-screen hidden">
+      <div class="quiz-top">
+        <div class="quiz-progress-track">
+          <div id="quiz-progress-fill" class="quiz-progress-fill"></div>
+        </div>
+        <div class="quiz-progress-label">
+          Question <span id="quiz-q-num">1</span> of <span id="quiz-q-total">10</span>
+        </div>
+      </div>
+      <div class="quiz-card">
+        <div class="quiz-lesson-tag" id="quiz-lesson-tag"></div>
+        <div class="quiz-question-text" id="quiz-question-text"></div>
+        <div class="quiz-options" id="quiz-options"></div>
+      </div>
+    </div>
+
+    <!-- Results screen -->
+    <div id="quiz-results" class="quiz-screen hidden">
+      <div class="quiz-results-card">
+        <div class="quiz-score-ring" id="quiz-score-ring">
+          <span id="quiz-score-text">0/10</span>
+        </div>
+        <h2 id="quiz-results-title">Quiz Complete!</h2>
+        <p id="quiz-results-sub"></p>
+        <div id="quiz-wrong-list" class="quiz-wrong-list"></div>
+        <div class="quiz-results-actions">
+          <button class="quiz-retry-btn" id="btn-quiz-retry">Try again</button>
+          <button class="quiz-dash-btn" id="btn-quiz-dash">Back to Dashboard</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- ═══════════════════════════════════════
+     SCHEMA MODAL
+═══════════════════════════════════════ -->
+<div id="schema-modal" class="modal-overlay hidden">
+  <div class="modal schema-modal">
+    <div class="schema-header">
+      <h2>Database Schema</h2>
+      <button class="schema-close-btn" id="btn-schema-close">✕</button>
+    </div>
+    <div class="erd-grid">
+
+      <div class="erd-table">
+        <div class="erd-table-hdr" style="background:#3b82f6">departments</div>
+        <div class="erd-row"><span class="erd-col-name">id</span> <span class="erd-pk">PK</span></div>
+        <div class="erd-row"><span class="erd-col-name">name</span></div>
+        <div class="erd-row"><span class="erd-col-name">budget</span></div>
+        <div class="erd-row"><span class="erd-col-name">location</span></div>
+      </div>
+
+      <div class="erd-table">
+        <div class="erd-table-hdr" style="background:#10b981">employees</div>
+        <div class="erd-row"><span class="erd-col-name">id</span> <span class="erd-pk">PK</span></div>
+        <div class="erd-row"><span class="erd-col-name">name</span></div>
+        <div class="erd-row"><span class="erd-col-name">department_id</span> <span class="erd-fk">→ departments</span></div>
+        <div class="erd-row"><span class="erd-col-name">salary</span></div>
+        <div class="erd-row"><span class="erd-col-name">hire_date</span></div>
+        <div class="erd-row"><span class="erd-col-name">manager_id</span> <span class="erd-fk">→ employees</span></div>
+      </div>
+
+      <div class="erd-table">
+        <div class="erd-table-hdr" style="background:#8b5cf6">employee_projects</div>
+        <div class="erd-row"><span class="erd-col-name">employee_id</span> <span class="erd-fk">→ employees</span> <span class="erd-pk">PK</span></div>
+        <div class="erd-row"><span class="erd-col-name">project_id</span> <span class="erd-fk">→ projects</span> <span class="erd-pk">PK</span></div>
+        <div class="erd-row"><span class="erd-col-name">role</span></div>
+      </div>
+
+      <div class="erd-table">
+        <div class="erd-table-hdr" style="background:#f59e0b">projects</div>
+        <div class="erd-row"><span class="erd-col-name">id</span> <span class="erd-pk">PK</span></div>
+        <div class="erd-row"><span class="erd-col-name">name</span></div>
+        <div class="erd-row"><span class="erd-col-name">start_date</span></div>
+        <div class="erd-row"><span class="erd-col-name">end_date</span></div>
+        <div class="erd-row"><span class="erd-col-name">status</span></div>
+      </div>
+
+    </div>
+    <div class="schema-sample-data">
+      4 departments &nbsp;·&nbsp; 10 employees &nbsp;·&nbsp; 5 projects &nbsp;·&nbsp; 10 assignments
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     BREAK MODAL
+═══════════════════════════════════════ -->
+<div id="break-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-emoji">☕</div>
+    <h2>Session Complete!</h2>
+    <p>Nice work — lesson done. Time for a short break.<br>
+    Step away for 5–10 minutes before the next session.</p>
+    <div class="modal-actions">
+      <button class="modal-btn" id="modal-keep-going">Skip break</button>
+      <button class="modal-btn modal-primary" id="modal-break">Take a break ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- CodeMirror (local) -->
+<script src="vendor/codemirror/codemirror.min.js"></script>
+<script src="vendor/codemirror/sql.min.js"></script>
+<script src="vendor/codemirror/matchbrackets.min.js"></script>
+<script src="vendor/codemirror/closebrackets.min.js"></script>
+
+<!-- SQL.js (local) -->
+<script src="vendor/sqljs/sql-wasm.js"></script>
+
+<!-- Register service worker -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
+</script>
+<script src="js/lessons.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
