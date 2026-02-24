@@ -948,19 +948,65 @@ function showQuizResults() {
 function exportSyncCode() {
   const raw  = localStorage.getItem(STORAGE_KEY) || '{}';
   const code = btoa(unescape(encodeURIComponent(raw)));
-
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(code)
-      .then(() => showToast('Sync code copied! Paste it on your other device.'))
-      .catch(() => fallbackCopy(code));
-  } else {
-    fallbackCopy(code);
-  }
+  showSyncCodeModal(code);
 }
 
-function fallbackCopy(code) {
-  // prompt() works on mobile as a reliable clipboard fallback
-  prompt('Copy this sync code and paste it on your other device:', code);
+function showSyncCodeModal(code) {
+  const existing = document.getElementById('sync-code-modal');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'sync-code-modal';
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:#00000090;display:flex;align-items:center;
+    justify-content:center;z-index:600;padding:20px;
+  `;
+
+  overlay.innerHTML = `
+    <div style="background:#1a1d2e;border:1px solid #2a2e45;border-radius:12px;
+                padding:24px;max-width:480px;width:100%;display:flex;flex-direction:column;gap:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <strong style="color:#e2e8f0;font-size:15px;">Your Sync Code</strong>
+        <button id="sync-modal-close" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;padding:0 4px;">✕</button>
+      </div>
+      <p style="color:#94a3b8;font-size:13px;margin:0;">
+        Copy this code and paste it on your other device using "↓ Import code".
+      </p>
+      <textarea id="sync-code-output" readonly style="
+        background:#0d1117;border:1px solid #2a2e45;border-radius:8px;
+        color:#a5f3c4;font-family:monospace;font-size:12px;padding:10px;
+        resize:none;height:100px;width:100%;box-sizing:border-box;
+      ">${code}</textarea>
+      <button id="sync-modal-copy" style="
+        background:#6366f1;color:#fff;border:none;border-radius:8px;
+        padding:10px;font-size:14px;font-weight:600;cursor:pointer;
+      ">Copy to clipboard</button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // Auto-select the code
+  const ta = document.getElementById('sync-code-output');
+  ta.focus();
+  ta.select();
+
+  // Copy button
+  document.getElementById('sync-modal-copy').addEventListener('click', () => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code)
+        .then(() => showToast('Copied!'))
+        .catch(() => { ta.select(); showToast('Select the text above and copy manually.'); });
+    } else {
+      ta.select();
+      document.execCommand('copy');
+      showToast('Copied!');
+    }
+  });
+
+  // Close
+  document.getElementById('sync-modal-close').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 }
 
 function importSyncCode() {
