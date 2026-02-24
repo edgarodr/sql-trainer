@@ -161,7 +161,7 @@ kbd {
 
 /* ---------- Views ---------- */
 .view { display: block; }
-.view.hidden { display: none; }
+.view.hidden { display: none !important; }
 main.view { padding: 28px 32px; max-width: 1280px; margin: 0 auto; }
 
 /* ---------- Dashboard Hero ---------- */
@@ -370,8 +370,9 @@ main.view { padding: 28px 32px; max-width: 1280px; margin: 0 auto; }
 
 .lesson-row.done .lesson-row-status { color: var(--success); }
 
-/* ---------- LESSON VIEW ---------- */
-main#view-lesson {
+/* ---------- LESSON / CHALLENGE DETAIL VIEWS ---------- */
+main#view-lesson,
+main#view-challenge-detail {
   padding: 0;
   max-width: 100%;
   height: calc(100vh - 52px);
