@@ -1663,3 +1663,179 @@ main#view-quiz {
   transition: all 0.15s;
 }
 .import-cancel-btn:hover { background: var(--surface2); color: var(--text); }
+
+/* ═══════════════════════════════════════════════════════════════
+   CHALLENGES
+═══════════════════════════════════════════════════════════════ */
+
+/* ── Header ──────────────────────────────────────────────────── */
+.challenges-header {
+  margin-bottom: 28px;
+}
+.challenges-header h1 {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.challenges-header > p {
+  color: var(--text-2);
+  font-size: 14px;
+  margin-bottom: 18px;
+}
+
+/* ── Difficulty filter pills ─────────────────────────────────── */
+.ch-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ch-filter {
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  background: var(--surface);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ch-filter:hover { border-color: var(--border2); color: var(--text); }
+.ch-filter.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* ── Schema section ──────────────────────────────────────────── */
+.ch-section { margin-bottom: 36px; }
+.ch-section-hdr {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.ch-section-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+.ch-section-hdr h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+.ch-section-sub {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-left: auto;
+}
+
+/* ── Challenge cards ─────────────────────────────────────────── */
+.ch-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.ch-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ch-card:hover {
+  border-color: var(--border2);
+  background: var(--surface2);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+.ch-card.solved {
+  border-left-color: var(--success);
+  background: color-mix(in srgb, var(--surface) 90%, var(--success) 10%);
+}
+.ch-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ch-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+}
+.ch-solved-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--success);
+  white-space: nowrap;
+}
+.ch-company-hint {
+  font-size: 11px;
+  color: var(--text-3);
+  font-style: italic;
+}
+
+/* ── Difficulty badge ────────────────────────────────────────── */
+.ch-diff-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ch-diff-badge.medium    { background: #2e1e0533; color: var(--warning); border: 1px solid #f59e0b44; }
+.ch-diff-badge.hard      { background: #2e100533; color: #f97316;        border: 1px solid #f9731644; }
+.ch-diff-badge.very-hard { background: var(--error-bg); color: var(--error); border: 1px solid #ef444444; }
+
+/* ── Tags row ────────────────────────────────────────────────── */
+.ch-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.ch-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-3);
+  background: var(--surface3);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+
+/* ── Challenge detail: difficulty badge in topbar ────────────── */
+.lesson-topbar-right .ch-diff-badge {
+  margin-right: 4px;
+}
+
+/* ── Challenge checker (always visible, no hidden state) ─────── */
+#ch-checker-wrap {
+  border-top: 1px solid var(--border);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+}
+
+@media (max-width: 600px) {
+  .ch-cards { grid-template-columns: 1fr; }
+  .ch-section-sub { display: none; }
+}

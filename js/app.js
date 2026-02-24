@@ -14,6 +14,12 @@ let currentExerciseIdx = null;
 
 let currentQuiz = null; // { questions[], idx, score, wrong[] }
 
+// ── Challenge state ────────────────────────────────────────────────────────────
+let challengeDb        = null;   // separate SQL.Database for challenges
+let challengeEditor    = null;   // separate CodeMirror instance
+let currentChallengeId = null;   // string id of active challenge
+let activeDiffFilter   = 'all';  // current filter on challenges grid
+
 // ── Progress (localStorage) ───────────────────────────────────────────────────
 const STORAGE_KEY = 'sql-trainer-progress';
 
@@ -176,6 +182,52 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('sync-input').value = '';
   });
 
+  // Challenges
+  document.getElementById('ch-back-btn').addEventListener('click', () => showView('challenges'));
+  document.getElementById('ch-btn-run').addEventListener('click', runChallengeQuery);
+  document.getElementById('ch-btn-check').addEventListener('click', checkCurrentChallenge);
+  document.getElementById('ch-btn-clear').addEventListener('click', () => {
+    challengeEditor.setValue(''); challengeEditor.focus();
+  });
+  document.getElementById('ch-btn-reset-db').addEventListener('click', () => {
+    if (currentChallengeId) {
+      const ch = CHALLENGES.find(c => c.id === currentChallengeId);
+      if (ch) { initChallengeDb(ch.schema); showToast('Database reset.'); }
+    }
+  });
+  document.getElementById('ch-btn-hint').addEventListener('click', () => {
+    const ch = CHALLENGES.find(c => c.id === currentChallengeId);
+    if (!ch) return;
+    const box = document.getElementById('ch-hint-box');
+    box.innerHTML = ch.hint;
+    box.classList.toggle('hidden');
+  });
+  document.getElementById('ch-btn-solution').addEventListener('click', () => {
+    const ch = CHALLENGES.find(c => c.id === currentChallengeId);
+    if (!ch) return;
+    const box = document.getElementById('ch-solution-box');
+    box.innerHTML = `<pre>${escapeHtml(ch.solution.trim())}</pre>`;
+    box.classList.toggle('hidden');
+  });
+  document.getElementById('ch-btn-schema').addEventListener('click', () => {
+    document.getElementById('ch-schema-modal').classList.remove('hidden');
+  });
+  document.getElementById('ch-btn-schema-close').addEventListener('click', () => {
+    document.getElementById('ch-schema-modal').classList.add('hidden');
+  });
+  document.getElementById('ch-schema-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('ch-schema-modal'))
+      document.getElementById('ch-schema-modal').classList.add('hidden');
+  });
+  document.querySelectorAll('.ch-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.ch-filter').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeDiffFilter = btn.dataset.diff;
+      renderChallenges();
+    });
+  });
+
   document.getElementById('btn-start-quiz').addEventListener('click', startQuiz);
   document.getElementById('btn-quiz-retry').addEventListener('click', () => {
     document.getElementById('quiz-results').classList.add('hidden');
@@ -194,6 +246,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     // Initialize CodeMirror now that DOM is ready
     initEditor();
+    initChallengeEditor();
 
     document.getElementById('loading-overlay').style.display = 'none';
     showView('dashboard');
@@ -265,7 +318,7 @@ function resetDatabase() {
 
 // ── Views ─────────────────────────────────────────────────────────────────────
 function showView(name) {
-  ['dashboard', 'lesson', 'review', 'quiz'].forEach(v => {
+  ['dashboard', 'lesson', 'review', 'quiz', 'challenges', 'challenge-detail'].forEach(v => {
     document.getElementById(`view-${v}`).classList.toggle('hidden', v !== name);
   });
 
@@ -273,9 +326,10 @@ function showView(name) {
     btn.classList.toggle('active', btn.dataset.view === name);
   });
 
-  if (name === 'review')    renderReview();
-  if (name === 'dashboard') { renderDashboard(); updateContinueBanner(); }
-  if (name === 'quiz')      renderQuizStart();
+  if (name === 'review')     renderReview();
+  if (name === 'dashboard')  { renderDashboard(); updateContinueBanner(); }
+  if (name === 'quiz')       renderQuizStart();
+  if (name === 'challenges') renderChallenges();
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -1045,6 +1099,308 @@ function showToast(message) {
   document.body.appendChild(toast);
   setTimeout(() => { toast.style.opacity = '0'; }, 2000);
   setTimeout(() => toast.remove(), 2400);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHALLENGES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Challenge Progress ────────────────────────────────────────────────────────
+function getChallengeProgress() {
+  return getProgress().challengeProgress || {};
+}
+
+function markChallengeSolved(id) {
+  const p = getProgress();
+  p.challengeProgress = p.challengeProgress || {};
+  p.challengeProgress[id] = p.challengeProgress[id] || {};
+  p.challengeProgress[id].solved = true;
+  p.challengeProgress[id].attempts = (p.challengeProgress[id].attempts || 0) + 1;
+  saveProgress(p);
+}
+
+function recordChallengeAttempt(id) {
+  const p = getProgress();
+  p.challengeProgress = p.challengeProgress || {};
+  p.challengeProgress[id] = p.challengeProgress[id] || {};
+  p.challengeProgress[id].attempts = (p.challengeProgress[id].attempts || 0) + 1;
+  saveProgress(p);
+}
+
+// ── Challenge DB ──────────────────────────────────────────────────────────────
+function initChallengeDb(schemaKey) {
+  if (challengeDb) { try { challengeDb.close(); } catch (_) {} }
+  challengeDb = new SQL.Database();
+  challengeDb.run(CHALLENGE_SCHEMAS[schemaKey]);
+}
+
+// ── Challenge Editor ──────────────────────────────────────────────────────────
+function initChallengeEditor() {
+  const textarea = document.getElementById('ch-sql-editor');
+  challengeEditor = CodeMirror.fromTextArea(textarea, {
+    mode: 'text/x-sql',
+    theme: 'material-darker',
+    lineNumbers: true,
+    matchBrackets: true,
+    autoCloseBrackets: true,
+    indentWithTabs: false,
+    indentUnit: 2,
+    lineWrapping: false,
+    extraKeys: {
+      'Ctrl-Enter': runChallengeQuery,
+      'Cmd-Enter':  runChallengeQuery,
+      'Tab': cm => cm.replaceSelection('  '),
+    },
+  });
+}
+
+// ── Execute SQL against challengeDb ──────────────────────────────────────────
+function execChallengeSQL(sql) {
+  try {
+    const results = challengeDb.exec(sql);
+    if (!results.length) return { type: 'empty', message: 'Query executed. No rows returned.' };
+    return { type: 'table', data: results[0] };
+  } catch (err) {
+    return { type: 'error', message: translateChallengeError(err.message) };
+  }
+}
+
+function execChallengeSQLClean(sql, schemaKey) {
+  let tmpDb;
+  try {
+    tmpDb = new SQL.Database();
+    tmpDb.run(CHALLENGE_SCHEMAS[schemaKey]);
+    const results = tmpDb.exec(sql);
+    tmpDb.close();
+    if (!results.length) return null;
+    return results[0];
+  } catch (_) {
+    if (tmpDb) { try { tmpDb.close(); } catch (__) {} }
+    return null;
+  }
+}
+
+function translateChallengeError(raw) {
+  const r = raw || '';
+  const m1 = r.match(/no such column:\s*(\S+)/i);
+  if (m1) return `Column "${m1[1]}" doesn't exist. Check the schema for the correct column names.`;
+  const m2 = r.match(/no such table:\s*(\S+)/i);
+  if (m2) return `Table "${m2[1]}" doesn't exist. Click "⊞ Schema" to see available tables.`;
+  const m3 = r.match(/near "(.+?)":\s*syntax error/i);
+  if (m3) return `Syntax error near "${m3[1]}". Check for typos, missing commas, or misspelled keywords.`;
+  if (/misuse of aggregate/i.test(r))
+    return 'Aggregate functions (SUM, COUNT, etc.) cannot be used in WHERE. Use HAVING after GROUP BY.';
+  if (/ambiguous column/i.test(r))
+    return 'Ambiguous column name — qualify it with the table name (e.g. e.name instead of name).';
+  return `SQL error: ${raw}`;
+}
+
+// ── Run query in challenge view ───────────────────────────────────────────────
+function runChallengeQuery() {
+  const sql = challengeEditor ? challengeEditor.getValue().trim() : '';
+  if (!sql) return;
+
+  const result = execChallengeSQL(sql);
+  const area = document.getElementById('ch-results-area');
+  const meta = document.getElementById('ch-results-meta');
+
+  if (result.type === 'error') {
+    area.innerHTML = `<div class="results-error">${escapeHtml(result.message)}</div>`;
+    meta.textContent = '';
+  } else if (result.type === 'empty') {
+    area.innerHTML = `<div class="results-empty"><span class="results-icon">✓</span><span>${result.message}</span></div>`;
+    meta.textContent = '';
+  } else {
+    const { columns, values } = result.data;
+    area.innerHTML = buildResultTable(columns, values);
+    meta.textContent = `${values.length} row${values.length !== 1 ? 's' : ''}`;
+  }
+}
+
+// ── Check challenge answer ────────────────────────────────────────────────────
+function checkCurrentChallenge() {
+  if (!currentChallengeId) return;
+  const ch = CHALLENGES.find(c => c.id === currentChallengeId);
+  if (!ch) return;
+
+  const userSQL = challengeEditor ? challengeEditor.getValue().trim() : '';
+  if (!userSQL) { showChallengeCheckResult(false, 'Write a query first.'); return; }
+
+  const userExec = execChallengeSQL(userSQL);
+  runChallengeQuery();
+
+  if (userExec.type === 'error') {
+    showChallengeCheckResult(false, userExec.message);
+    hideChallengesDiffView();
+    return;
+  }
+
+  const expData  = execChallengeSQLClean(ch.solution, ch.schema);
+  const userData = userExec.type === 'table' ? userExec.data : null;
+  const { pass, message } = compareResults(userData, expData);
+
+  recordChallengeAttempt(ch.id);
+
+  if (pass) {
+    markChallengeSolved(ch.id);
+    showChallengeCheckResult(true, '✓ Correct! Challenge solved.');
+    hideChallengesDiffView();
+  } else {
+    showChallengeCheckResult(false, `✗ Not quite. ${message}`);
+    renderChallengesDiffView(userData, expData);
+  }
+}
+
+function showChallengeCheckResult(pass, message) {
+  const el = document.getElementById('ch-check-result');
+  el.className = `check-result ${pass ? 'pass' : 'fail'}`;
+  el.textContent = message;
+  el.classList.remove('hidden');
+}
+
+function hideChallengesDiffView() {
+  document.getElementById('ch-diff-view').classList.add('hidden');
+}
+
+function renderChallengesDiffView(userData, expData) {
+  const uRows = userData ? userData.values : [];
+  const eRows = expData  ? expData.values  : [];
+  const uCols = userData ? userData.columns : [];
+  const eCols = expData  ? expData.columns  : [];
+
+  document.getElementById('ch-diff-yours-count').textContent = `(${uRows.length} row${uRows.length !== 1 ? 's' : ''})`;
+  document.getElementById('ch-diff-exp-count').textContent   = `(${eRows.length} row${eRows.length !== 1 ? 's' : ''})`;
+  document.getElementById('ch-diff-yours-table').innerHTML   = buildResultTable(uCols, uRows);
+  document.getElementById('ch-diff-exp-table').innerHTML     = buildResultTable(eCols, eRows);
+  document.getElementById('ch-diff-view').classList.remove('hidden');
+}
+
+// ── Load a challenge into the detail view ─────────────────────────────────────
+function loadChallenge(id) {
+  const ch = CHALLENGES.find(c => c.id === id);
+  if (!ch) return;
+
+  currentChallengeId = id;
+
+  // Seed the challenge database
+  initChallengeDb(ch.schema);
+
+  // Breadcrumb + schema tag
+  const info = CHALLENGE_SCHEMA_INFO[ch.schema];
+  const tag  = document.getElementById('ch-schema-tag');
+  tag.textContent  = info.label;
+  tag.style.background = info.color;
+
+  document.getElementById('ch-title').textContent = ch.title;
+
+  // Difficulty badge
+  const badge = document.getElementById('ch-difficulty-badge');
+  const labels = { medium: 'Medium', hard: 'Hard', 'very-hard': 'Very Hard' };
+  badge.textContent = labels[ch.difficulty] || ch.difficulty;
+  badge.className   = `ch-diff-badge ${ch.difficulty}`;
+
+  // Description
+  document.getElementById('ch-description').innerHTML = ch.description;
+
+  // Populate schema modal
+  renderChallengeSchemaModal(ch.schema);
+
+  // Reset editor + results + checker
+  if (challengeEditor) challengeEditor.setValue('');
+  document.getElementById('ch-results-area').innerHTML = `
+    <div class="results-empty">
+      <span class="results-icon">▷</span>
+      <span>Run a query to see results here</span>
+    </div>`;
+  document.getElementById('ch-results-meta').textContent = '';
+  document.getElementById('ch-check-result').classList.add('hidden');
+  document.getElementById('ch-hint-box').classList.add('hidden');
+  document.getElementById('ch-solution-box').classList.add('hidden');
+  hideChallengesDiffView();
+
+  showView('challenge-detail');
+}
+
+// ── Schema modal for challenges ───────────────────────────────────────────────
+function renderChallengeSchemaModal(schemaKey) {
+  const info = CHALLENGE_SCHEMA_INFO[schemaKey];
+  document.getElementById('ch-schema-modal-title').textContent = `${info.label} Schema`;
+  document.getElementById('ch-schema-summary').textContent = info.summary;
+
+  const grid = document.getElementById('ch-erd-grid');
+  grid.innerHTML = info.tables.map(t => `
+    <div class="erd-table">
+      <div class="erd-table-hdr" style="background:${info.color}">${t.name}</div>
+      ${t.columns.map(col => {
+        const isPK = col.includes('PK');
+        const isFK = col.includes('→');
+        const name = col.replace(/ PK| →.*/, '').trim();
+        return `<div class="erd-row">
+          <span class="erd-col-name">${name}</span>
+          ${isPK ? '<span class="erd-pk">PK</span>' : ''}
+          ${isFK ? `<span class="erd-fk">→ ${col.split('→')[1].trim()}</span>` : ''}
+        </div>`;
+      }).join('')}
+    </div>
+  `).join('');
+}
+
+// ── Render challenges grid ────────────────────────────────────────────────────
+function renderChallenges() {
+  const progress = getChallengeProgress();
+  const grid     = document.getElementById('challenges-grid');
+  const schemas  = ['ecommerce', 'hr'];
+
+  const filtered = activeDiffFilter === 'all'
+    ? CHALLENGES
+    : CHALLENGES.filter(c => c.difficulty === activeDiffFilter);
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `<p style="color:var(--text-3);padding:20px 0">No challenges match this filter.</p>`;
+    return;
+  }
+
+  grid.innerHTML = schemas.map(key => {
+    const info  = CHALLENGE_SCHEMA_INFO[key];
+    const cards = filtered.filter(c => c.schema === key);
+    if (!cards.length) return '';
+
+    const solved = cards.filter(c => progress[c.id] && progress[c.id].solved).length;
+
+    return `
+      <div class="ch-section">
+        <div class="ch-section-hdr">
+          <div class="ch-section-icon" style="background:${info.color}22; color:${info.color}">
+            ${key === 'ecommerce' ? '🛒' : '🏢'}
+          </div>
+          <h2>${info.label}</h2>
+          <span class="ch-section-sub">${solved} / ${cards.length} solved</span>
+        </div>
+        <div class="ch-cards">
+          ${cards.map(ch => {
+            const done      = progress[ch.id] && progress[ch.id].solved;
+            const labels    = { medium: 'Medium', hard: 'Hard', 'very-hard': 'Very Hard' };
+            return `
+              <div class="ch-card ${done ? 'solved' : ''}" data-id="${ch.id}">
+                <div class="ch-card-top">
+                  <span class="ch-card-title">${ch.title}</span>
+                  ${done ? '<span class="ch-solved-badge">✓ Solved</span>' : ''}
+                </div>
+                <span class="ch-diff-badge ${ch.difficulty}">${labels[ch.difficulty]}</span>
+                <span class="ch-company-hint">${ch.company_hint}</span>
+                <div class="ch-tags">
+                  ${ch.tags.map(t => `<span class="ch-tag">${t}</span>`).join('')}
+                </div>
+              </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }).join('');
+
+  // Attach click handlers
+  grid.querySelectorAll('.ch-card').forEach(card => {
+    card.addEventListener('click', () => loadChallenge(card.dataset.id));
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -4,7 +4,7 @@
    Bump CACHE_VERSION to force a full refresh.
    ============================================= */
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME    = `sql-trainer-${CACHE_VERSION}`;
 
 const ASSETS = [
@@ -23,6 +23,7 @@ const ASSETS = [
   '/vendor/codemirror/closebrackets.min.js',
   '/vendor/sqljs/sql-wasm.js',
   '/vendor/sqljs/sql-wasm.wasm',
+  '/js/challenges.js',
 ];
 
 // Pre-cache all assets on install

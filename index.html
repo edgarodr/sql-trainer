@@ -28,6 +28,7 @@
     <button class="nav-btn active" data-view="dashboard">Dashboard</button>
     <button class="nav-btn" data-view="review">Review Cards</button>
     <button class="nav-btn" data-view="quiz">Quiz</button>
+    <button class="nav-btn" data-view="challenges">Challenges</button>
   </div>
   <div class="nav-right">
     <div class="session-indicator">
@@ -351,6 +352,118 @@ SELECT * FROM employees;"
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════
+     CHALLENGES LIST VIEW
+═══════════════════════════════════════ -->
+<main id="view-challenges" class="view hidden">
+  <div class="challenges-header">
+    <h1>Interview Challenges</h1>
+    <p>Real-world SQL problems styled after tech company interviews. No hints from the docs — just you and the data.</p>
+    <div class="ch-filters">
+      <button class="ch-filter active" data-diff="all">All</button>
+      <button class="ch-filter" data-diff="medium">Medium</button>
+      <button class="ch-filter" data-diff="hard">Hard</button>
+      <button class="ch-filter" data-diff="very-hard">Very Hard</button>
+    </div>
+  </div>
+  <div id="challenges-grid"></div>
+</main>
+
+<!-- ═══════════════════════════════════════
+     CHALLENGE DETAIL VIEW
+═══════════════════════════════════════ -->
+<main id="view-challenge-detail" class="view hidden">
+  <div class="lesson-topbar">
+    <button class="back-btn" id="ch-back-btn">← Challenges</button>
+    <div class="lesson-breadcrumb">
+      <span id="ch-schema-tag" class="lb-module"></span>
+      <span class="lb-sep">›</span>
+      <span id="ch-title" class="lb-title"></span>
+    </div>
+    <div class="lesson-topbar-right">
+      <span id="ch-difficulty-badge" class="ch-diff-badge"></span>
+      <button class="schema-fab" id="ch-btn-schema" title="View schema">
+        <span class="schema-fab-icon">⊞</span> Schema
+      </button>
+    </div>
+  </div>
+
+  <div class="lesson-layout">
+    <!-- Left panel: problem description -->
+    <div class="l-panel left-panel">
+      <div id="ch-description" class="panel-body scrollable theory-content"></div>
+    </div>
+
+    <!-- Right panel: editor + results + checker -->
+    <div class="l-panel right-panel">
+      <div class="editor-wrap">
+        <div class="editor-toolbar">
+          <span class="tl-label">SQL Editor</span>
+          <div class="tl-right">
+            <button class="tl-btn" id="ch-btn-clear">Clear</button>
+            <button class="tl-btn" id="ch-btn-reset-db" title="Restore sample data">↺ Reset DB</button>
+            <button class="run-btn" id="ch-btn-run">▶ Run &nbsp;<kbd>Ctrl+↵</kbd></button>
+          </div>
+        </div>
+        <textarea
+          id="ch-sql-editor"
+          spellcheck="false"
+          autocorrect="off"
+          autocapitalize="off"
+          placeholder="-- Write your SQL here"></textarea>
+      </div>
+
+      <div class="results-wrap">
+        <div class="results-toolbar">
+          <span class="tl-label">Results</span>
+          <span id="ch-results-meta" class="results-meta"></span>
+        </div>
+        <div id="ch-results-area" class="results-area">
+          <div class="results-empty">
+            <span class="results-icon">▷</span>
+            <span>Run a query to see results here</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="checker-wrap" id="ch-checker-wrap">
+        <div class="checker-actions">
+          <button class="check-btn"    id="ch-btn-check">✓ Check answer</button>
+          <button class="hint-btn"     id="ch-btn-hint">💡 Hint</button>
+          <button class="solution-btn" id="ch-btn-solution">Show solution</button>
+        </div>
+        <div id="ch-check-result" class="check-result hidden"></div>
+        <div id="ch-hint-box"     class="hint-box hidden"></div>
+        <div id="ch-solution-box" class="solution-box hidden"></div>
+        <div id="ch-diff-view"    class="diff-view hidden">
+          <div class="diff-panel">
+            <div class="diff-hdr diff-hdr-yours">Your output <span id="ch-diff-yours-count" class="diff-count"></span></div>
+            <div class="diff-table-wrap" id="ch-diff-yours-table"></div>
+          </div>
+          <div class="diff-panel">
+            <div class="diff-hdr diff-hdr-expected">Expected <span id="ch-diff-exp-count" class="diff-count"></span></div>
+            <div class="diff-table-wrap" id="ch-diff-exp-table"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ═══════════════════════════════════════
+     CHALLENGE SCHEMA MODAL
+═══════════════════════════════════════ -->
+<div id="ch-schema-modal" class="modal-overlay hidden">
+  <div class="modal schema-modal">
+    <div class="schema-header">
+      <h2 id="ch-schema-modal-title">Schema</h2>
+      <button class="schema-close-btn" id="ch-btn-schema-close">✕</button>
+    </div>
+    <div id="ch-erd-grid" class="erd-grid"></div>
+    <div id="ch-schema-summary" class="schema-sample-data"></div>
+  </div>
+</div>
+
 <!-- CodeMirror (local) -->
 <script src="vendor/codemirror/codemirror.min.js"></script>
 <script src="vendor/codemirror/sql.min.js"></script>
@@ -369,6 +482,7 @@ SELECT * FROM employees;"
   }
 </script>
 <script src="js/lessons.js"></script>
+<script src="js/challenges.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
