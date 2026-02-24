@@ -246,7 +246,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     // Initialize CodeMirror now that DOM is ready
     initEditor();
-    initChallengeEditor();
+    // challengeEditor is initialized lazily in loadChallenge() so it's
+    // never created inside a display:none container (which breaks CM layout)
 
     document.getElementById('loading-overlay').style.display = 'none';
     showView('dashboard');
@@ -325,6 +326,8 @@ function showView(name) {
   document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.view === name);
   });
+
+  window.scrollTo(0, 0);
 
   if (name === 'review')     renderReview();
   if (name === 'dashboard')  { renderDashboard(); updateContinueBanner(); }
@@ -1282,6 +1285,12 @@ function loadChallenge(id) {
 
   currentChallengeId = id;
 
+  // Show the view first so CodeMirror can measure dimensions correctly
+  showView('challenge-detail');
+
+  // Lazy-init the challenge editor (must be visible before CodeMirror init)
+  if (!challengeEditor) initChallengeEditor();
+
   // Seed the challenge database
   initChallengeDb(ch.schema);
 
@@ -1317,8 +1326,6 @@ function loadChallenge(id) {
   document.getElementById('ch-hint-box').classList.add('hidden');
   document.getElementById('ch-solution-box').classList.add('hidden');
   hideChallengesDiffView();
-
-  showView('challenge-detail');
 }
 
 // ── Schema modal for challenges ───────────────────────────────────────────────
