@@ -1078,7 +1078,32 @@ main#view-challenge-detail {
 }
 
 @media (max-width: 600px) {
-  .nav-center { display: none; }
+  /* Navbar: collapse logo text, make tabs scrollable */
+  .navbar { padding: 0 10px; gap: 6px; }
+  .nav-title { display: none; }
+  .nav-left { min-width: 0; }
+  .nav-right { min-width: 0; }
+  .session-label { display: none; }
+
+  .nav-center {
+    flex: 1;
+    justify-content: flex-start;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;       /* Firefox */
+    gap: 2px;
+    /* prevent nav from shrinking below its content */
+    min-width: 0;
+  }
+  .nav-center::-webkit-scrollbar { display: none; }   /* Chrome/Safari */
+
+  .nav-btn {
+    padding: 5px 11px;
+    font-size: 12px;
+    white-space: nowrap;         /* keep label on one line */
+    flex-shrink: 0;
+  }
+
   .lesson-breadcrumb { display: none; }
 }
 
